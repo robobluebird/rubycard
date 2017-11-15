@@ -1,15 +1,13 @@
 class CoolButton < CoolElement
-  attr_accessor :code, :id
+  attr_accessor :name, :code
+  attr_reader :button_style, :font_size
 
-  attr_reader :font_size, :button_type
-
-  def self.dsl(opts = {})
-    "cool_button #{opts[:text]}, width: #{opts[:width]}, height: #{opts[:height]}, \
-      button_type: #{opts[:button_type]}, font_size: #{opts[:font_size]}, code: #{opts[:code]}"
+  def title
+    @words.text
   end
 
-  def text
-    @words.text
+  def set_title(title)
+    @words.text = title
   end
 
   def increase_font_size
@@ -22,6 +20,11 @@ class CoolButton < CoolElement
     font_size!
   end
 
+  def set_font_size(font_size)
+    @font_size = font_size
+    font_size!
+  end
+
   def font_size!
     @words.style size: @font_size
   end
@@ -29,7 +32,7 @@ class CoolButton < CoolElement
   def style(styles = nil)
     super styles
 
-    if @button_type == :shadow
+    if @button_style == :shadow
       @shadow.style(width: width - 2, height: height - 2) if @shadow
       @background.style(width: width - 2, height: height - 2) if @background
       @normal_border.style(width: width - 2, height: height - 2) if @normal_border
@@ -53,28 +56,19 @@ class CoolButton < CoolElement
       @normal_border = border black, curve: 4, strokewidth: 1, width: width - 2, height: height - 2
       @selected_border = border black, linestyle: :dot
       @selected_border.hide
-      @words = para opts[:text] || 'New Button', left: 0, align: 'center'
+      @words = para opts[:title] || 'New Button', left: 0, align: 'center'
       @words.style(top: @words.parent.height / 2 - @words.height / 2)
       @words.style(size: opts[:font_size]) if opts[:font_size]
     end
 
-    set_button_type (opts[:button_type] || :shadow).to_sym
+    set_button_style (opts[:button_style] || :shadow).to_sym
 
     @font_size = @words.style[:size]
     @code = opts[:code] || "puts 'hi!'"
+    @name = opts[:name]
   end
 
-  def toggle_button_type
-    if @button_type == :shadow
-      set_button_type(:transparent)
-    elsif @button_type == :transparent
-      set_button_type(:plain)
-    elsif @button_type == :plain
-      set_button_type(:shadow)
-    end
-  end
-
-  def set_button_type(type)
+  def set_button_style(type)
     return nil unless [:shadow, :plain, :transparent].include? type.to_sym
 
     if type == :shadow
@@ -98,7 +92,7 @@ class CoolButton < CoolElement
 
     @words.style(top: @words.parent.height / 2 - @words.height / 2)
 
-    @button_type = type
+    @button_style = type
   end
 
   def select
@@ -108,8 +102,23 @@ class CoolButton < CoolElement
   end
 
   def deselect
-    @normal_border.show if @button_type != :transparent
-    @shadow.show if @button_type == :shadow
+    @normal_border.show if @button_style != :transparent
+    @shadow.show if @button_style == :shadow
     @selected_border.hide
+  end
+
+  def opts
+    {
+      'type' => 'button',
+      'top' => top,
+      'left' => left,
+      'width' => width,
+      'height' => height,
+      'name' => name,
+      'title' => title,
+      'font_size' => @font_size,
+      'button_style' => @button_style,
+      'code' => @code
+    }
   end
 end

@@ -16,6 +16,8 @@ class CoolListener
       @swt_app.real.notify_listeners(::Swt::SWT::MouseMove, event)
     elsif event.type == ::Swt::SWT::MouseDoubleClick
       @swt_app.real.notify_listeners(::Swt::SWT::MouseDoubleClick, event)
+    elsif event.type == ::Swt::SWT::KeyDown
+      @swt_app.real.notify_listeners(::Swt::SWT::KeyDown, event)
     end
   end
 end

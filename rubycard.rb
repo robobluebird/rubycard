@@ -11,61 +11,16 @@ require './lib/cool_popup'
 require './lib/cool_listener'
 require 'json'
 
-Shoes.app title: 'rubycard', width: 512, height: 346, resizable: false, scroll: false do
+Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: false do
   background white
 
-  # @user_levels = { 1: 'browsing', 2: 'typing', 3: 'painting', 4: 'authoring', 5: 'scripting' }
-
-  @protection_types = [
-    "can't modify stack",
-    "can't delete stack",
-    "can't abort",
-    "can't peek",
-    "private access"
-  ]
-
   @current_tool = :hand
-  @current_user_level = 5
+  @element = nil
+  @gesture = false
+  @left_offset = nil
+  @top_offset = nil
 
-  # @user_level_adjuster = window do
-  #   para 'meh'
-  # end
-
-  @tools = window title: '', width: 120, height: 240, top: 500, left: 500 do
-    flow margin: 5, height: 48 do
-      background black
-
-      @hand = image 'lib/images/handdark.png', width: 34, height: 34, left: 2, top: 2
-      @buttons = image 'lib/images/buttonlight.png', width: 34, height: 34, left: 38, top: 2
-      @fields = image 'lib/images/fieldlight.png', width: 34, height: 34, left: 74, top: 2
-
-      @hand.click = -> (i) { select_tool :hand }
-      @buttons.click = -> (i) { select_tool :button }
-      @fields.click = -> (i) { select_tool :field }
-    end
-
-    def select_tool(tool)
-      owner.current_tool = tool
-
-      @hand.path = 'lib/images/handlight.png'
-      @buttons.path = 'lib/images/buttonlight.png'
-      @fields.path = 'lib/images/fieldlight.png'
-
-      if tool == :hand
-        @hand.path = 'lib/images/handdark.png'
-      elsif tool == :button
-        @buttons.path = 'lib/images/buttondark.png'
-      elsif tool == :field
-        @fields.path = 'lib/images/fielddark.png'
-      end
-    end
-  end
-
-  @tools.set_location(x + width, y)
-  @tools.gui.shell.force_active
-  gui.shell.force_active
-
-  def unfocus_all
+  def unfocus_all!
     gui.shell.force_focus
   end
 
@@ -89,45 +44,15 @@ Shoes.app title: 'rubycard', width: 512, height: 346, resizable: false, scroll: 
     end
   end
 
-  # @current_card = stack do
-  #   @field = cool_field text: 'first'
-  #   @field2 = cool_field text: 'second'
-  #   @button = cool_button text: 'putsing'
-  #   @button2 = cool_button text: 'change button type'
-  #   @button3 = cool_button text: 'increase button font size'
-  #   @button4 = cool_button text: 'bring field to front', top: 200, left: 50
-  #   @button.id = 1
-  #   @button2.id = 2
-  #   @button3.id = 3
-  #   @button4.id = 4
-  #   @field2 = cool_field text: 'second'
-  #   @field2.id = 6
-  #   @field.id = 5
-  #   @button2.code = "@button.toggle_button_type"
-  #   @button3.code = "@button.increase_font_size"
-  #   @button4.code = "puts 'hi!'; @field2.java_text_widget.move_below(@field.java_text_widget)"
-  #   unfocus_all
-  # end
-
-  # def reverse_field_order!
-  #   cool_fields_in_wrong_order = @current_card.contents.reject { |c| c.is_a? CoolField }
-  #   real_fields_in_wrong_order = cool_fields_in_wrong_order.map { |f| f.gui.real }
-  # end
-  #
-  # reverse_field_order!
-
-  @element = nil
-  @gesture = false
-  @left_offset = nil
-  @top_offset = nil
-
   def correct_tool_for?(element)
     @current_tool == element.class.to_s.underscore.split('_').last.to_sym
   end
 
   def assign_element(left, top)
+    return if @current_card.nil?
+
     @current_card.contents.each do |elem|
-      next unless elem.is_a?(CoolElement) && modification_type(elem, left, top)
+      next unless elem.is_a?(CoolElement) && interaction_type(elem, left, top)
 
       @element = elem
       @left_offset = left - @element.left
@@ -135,7 +60,7 @@ Shoes.app title: 'rubycard', width: 512, height: 346, resizable: false, scroll: 
     end
   end
 
-  def modification_type(elem, left, top)
+  def interaction_type(elem, left, top)
     left_ranges = [
       (elem.left + elem.width - 10)..(elem.left + elem.width),
       elem.left..(elem.left + elem.width)
@@ -150,9 +75,9 @@ Shoes.app title: 'rubycard', width: 512, height: 346, resizable: false, scroll: 
     found_top = top_ranges.index { |range| range.cover? top }
 
     if (found_left == 0 && found_top == 0)
-      @modification_type = :resize
+      @interaction_type = :resize
     elsif found_left == 1 && found_top == 1
-      @modification_type = :move
+      @interaction_type = :move
     end
   end
 
@@ -167,7 +92,7 @@ Shoes.app title: 'rubycard', width: 512, height: 346, resizable: false, scroll: 
       @gesture = true
 
       if correct_tool_for? @element
-        if @modification_type == :move
+        if @interaction_type == :move
           new_left = left - @left_offset
           new_top = top - @top_offset
 
@@ -188,7 +113,7 @@ Shoes.app title: 'rubycard', width: 512, height: 346, resizable: false, scroll: 
                     end
 
           @element.move new_left, new_top
-        elsif @modification_type == :resize
+        elsif @interaction_type == :resize
           new_width = left - @element.left
           new_height = top - @element.top
 
@@ -221,19 +146,127 @@ Shoes.app title: 'rubycard', width: 512, height: 346, resizable: false, scroll: 
   double_click do |button, left, top|
     assign_element left, top
 
+    @element_to_modify = @element
+
     if @element && correct_tool_for?(@element)
-      cool_popup @element
+      if @element.is_a? CoolButton
+        window title: 'edit button', width: 200, height: 400 do
+          background lightgrey
+
+          @element = owner.instance_variable_get(:@element)
+
+          stack do
+            caption 'name'
+            @edit_name = edit_line @element.name
+
+            caption 'title'
+            @edit_title = edit_line @element.title
+
+            caption 'style'
+            @list_box = list_box items: ['shadow', 'plain', 'transparent']
+            @list_box.choose @element.button_style.to_s
+
+            caption 'font size'
+            @edit_font_size = edit_line @element.font_size.to_s
+
+            caption 'code'
+            @edit_code = edit_box @element.code
+
+            flow do
+              button 'cancel' do
+                close
+              end
+
+              button 'save' do
+                owner.set_button_styles(
+                  @edit_name.text,
+                  @edit_title.text,
+                  @list_box.text.to_sym,
+                  @edit_font_size.text.to_i,
+                  @edit_code.text
+                )
+
+                close
+              end
+            end
+          end
+        end
+      elsif @element.is_a? CoolField
+        window title: 'edit field', width: 200, height: 300 do
+          background lightgrey
+
+          @element = owner.instance_variable_get(:@element)
+
+          stack do
+            caption 'name'
+            @edit_name = edit_line @element.name
+
+            caption 'text'
+            @edit_text = edit_box @element.text
+
+            flow do
+              @hide_border = check; para 'hide border?'
+              @hide_border.checked = @element.hide_border
+            end
+
+            caption 'font size'
+            @edit_font_size = edit_line @element.font_size.to_s
+
+            flow do
+              button 'cancel' do
+                close
+              end
+
+              button 'save' do
+                owner.set_field_styles(
+                  @edit_name.text,
+                  @edit_text.text,
+                  @hide_border.checked?,
+                  @edit_font_size.text.to_i
+                )
+
+                close
+              end
+            end
+          end
+        end
+      end
     end
 
     @element = nil
     @gesture = false
-    @modification_type = nil
+    @interaction_type = nil
     @left_offset = nil
     @top_offset = nil
   end
 
+  def set_button_styles(name, title, button_style, font_size, code)
+    @element_to_modify.set_button_style button_style
+    @element_to_modify.set_font_size font_size
+    @element_to_modify.set_title title
+    @element_to_modify.name = name
+    @element_to_modify.code = code
+    @element_to_modify.style
+    @element_to_modify = nil
+
+    save!
+  end
+
+  def set_field_styles(name, text, hide_border, font_size)
+    @element_to_modify.set_text text
+    @element_to_modify.set_hide_border hide_border
+    @element_to_modify.set_font_size font_size
+    @element_to_modify.name = name
+    @element_to_modify.style
+    @element_to_modify = nil
+
+    save!
+  end
+
   release do |button, left, top|
     if @element
+      puts @element.class
+
       if !@gesture
         if @current_tool == :hand
           if @element.respond_to?(:code) && !@element.code.nil?
@@ -248,6 +281,7 @@ Shoes.app title: 'rubycard', width: 512, height: 346, resizable: false, scroll: 
         end
       else
         select @element if @element != @selected_element && correct_tool_for?(@element)
+        save!
       end
     else
       make_fields_uneditable!
@@ -256,7 +290,7 @@ Shoes.app title: 'rubycard', width: 512, height: 346, resizable: false, scroll: 
 
     @element = nil
     @gesture = false
-    @modification_type = nil
+    @interaction_type = nil
     @left_offset = nil
     @top_offset = nil
   end
@@ -274,6 +308,8 @@ Shoes.app title: 'rubycard', width: 512, height: 346, resizable: false, scroll: 
   end
 
   def make_fields_uneditable!
+    return if @current_card.nil?
+
     @current_card.contents.each do |elem|
       elem.editable = false if elem.respond_to?(:editable=) && elem != @element
     end
@@ -300,15 +336,39 @@ Shoes.app title: 'rubycard', width: 512, height: 346, resizable: false, scroll: 
     end
 
     represent!
+
+    @stack_related_stuff.show
+  end
+
+  def save!
+    elements = []
+
+    @current_card.contents.each do |elem|
+      if elem.is_a? CoolElement
+        elements.push constantize(elem.opts['type'].to_s.capitalize).new elem.opts
+      end
+    end
+
+    @current_stack.cards[@current_card_index].elements = elements
+
+    File.open(@current_stack.name, 'w+') do |f|
+      f.write JSON.pretty_generate(@current_stack.to_h)
+    end
   end
 
   def represent!
-    @current_card = clear do
-      background white
+    @card_holder.clear do
+      @current_card = stack top: 0, left: 0, height: '100%', width: '100%' do
+        background white
 
-      @current_stack.cards[@current_card_index].elements.each do |elem|
-        self.send(elem.method_sym, elem.opts)
+        @current_stack.cards[@current_card_index].elements.each do |elem|
+          self.send(elem.method_sym, elem.opts)
+        end
+
+        unfocus_all!
       end
+
+      @card_info.text = "#{@current_card_index + 1}/#{@current_stack.cards.count}"
     end
   end
 
@@ -326,48 +386,157 @@ Shoes.app title: 'rubycard', width: 512, height: 346, resizable: false, scroll: 
     end
   end
 
-  def save!
+  def delete_card!
+    if @current_stack.cards.count > 1
+      @current_stack.cards.delete_at @current_card_index
+
+      while @current_card_index >= @current_stack.cards.count
+        @current_card_index -= 1
+      end
+
+      represent!
+      save!
+    end
   end
 
-  load!(
-    JSON.parse({
-      name: 'a cool stack',
-      id: 1,
-      cards: [
-        {
-          elements: [
-            {
-              type: 'field',
-              text: 'a fun paragraph about horses',
-              hide_border: true
-            },
-            {
-              type: 'button',
-              top: 300,
-              left: 400,
-              text: 'next card',
-              code: 'next_card!'
-            }
-          ]
-        },
-        {
-          elements: [
-            {
-              type: 'button',
-              text: 'previous card',
-              top: 300,
-              left: 20,
-              code: 'prev_card!'
-            },
-            {
-              type: 'field',
-              text: 'crazy days',
-              hide_border: true,
-              font_size: 40
-            },
-          ]
-        }
-      ]
-    }.to_json)
-  )
+  def default!
+    stack left: 0, top: 0, width: 512, height: '100%'  do
+      t = title 'rubycard', align: 'center'
+      t.style top: height / 2 - t.height / 2
+    end
+  end
+
+  def select_tool(tool)
+    return if @current_card.nil?
+
+    @current_tool = tool
+    @hand.path = 'lib/images/handlight.png'
+    @buttons.path = 'lib/images/buttonlight.png'
+    @fields.path = 'lib/images/fieldlight.png'
+    @paint.path = 'lib/images/brushlight.png'
+
+    if tool == :hand
+      @hand.path = 'lib/images/handdark.png'
+    elsif tool == :button
+      @buttons.path = 'lib/images/buttondark.png'
+    elsif tool == :field
+      @fields.path = 'lib/images/fielddark.png'
+    elsif tool == :paint
+      @paint.path = 'lib/images/brushdark.png'
+    end
+  end
+
+  flow top: 0, left: 0, width: '100%', height: '100%' do
+    background white
+
+    @card_holder = default!
+
+    stack top: 0, left: 512, width: 120, height: '100%' do
+      background lightgrey
+
+      @stack_related_stuff = stack do
+        flow margin: 5, height: 84 do
+          background black
+
+          @hand = image 'lib/images/handdark.png', width: 34, height: 34, left: 2, top: 2
+          @buttons = image 'lib/images/buttonlight.png', width: 34, height: 34, left: 38, top: 2
+          @fields = image 'lib/images/fieldlight.png', width: 34, height: 34, left: 74, top: 2
+          @paint = image 'lib/images/brushlight.png', width: 34, height: 34, left: 2, top: 38
+
+          block_out = rect 38, 38, 70, 34
+          block_out.style fill: white, stroke: white
+
+          @hand.click = -> (i) { select_tool :hand }
+          @buttons.click = -> (i) { select_tool :button }
+          @fields.click = -> (i) { select_tool :field }
+          @paint.click = -> (i) { alert "I'm really sorry Rubyconf, there wasn't enough time to do this!" }
+        end
+
+        stack do
+          @card_info = para '', align: 'center'
+
+          button 'new button' do
+            @current_card.append do
+              cool_button
+            end
+
+            save!
+          end
+
+          button 'new field' do
+            @current_card.append do
+              cool_field
+            end
+
+            save!
+          end
+
+          button 'next card' do
+            next_card!
+          end
+
+          button 'previous card' do
+            prev_card!
+          end
+
+          button 'delete card' do
+            delete_card!
+          end
+
+          button 'new blank' do
+            @current_stack.cards.push Card.new
+            @current_card_index = @current_stack.cards.count - 1
+
+            represent!
+            save!
+          end
+
+          button 'new copy' do
+            dup = @current_stack.cards[@current_card_index].dup
+
+            @current_stack.cards.push dup
+            @current_card_index = @current_stack.cards.count - 1
+
+            represent!
+            save!
+          end
+        end
+      end
+
+      @stack_related_stuff.hide
+
+      @general_purpose_buttons = stack do
+        button 'new stack' do
+          filename = ask_save_file
+
+          if filename
+            @current_stack = Stack.new name: filename
+            @current_stack.cards.push Card.new
+            @current_card_index = 0
+
+            represent!
+            save!
+          end
+        end
+
+        button 'open stack' do
+          filename = ask_open_file
+
+          if filename
+            File.open(filename, 'r') do |f|
+              begin
+                load! JSON.parse f.read.strip
+              rescue => e
+                alert "failed to understand the file: #{e}"
+              end
+            end
+          end
+        end
+
+        button 'quit' do
+          quit
+        end
+      end
+    end
+  end
 end

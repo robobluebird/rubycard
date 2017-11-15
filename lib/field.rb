@@ -1,11 +1,12 @@
 class Field
-  attr_accessor :top, :left, :width, :height, :text, :font_size, :hide_border
+  attr_accessor :top, :left, :width, :height, :name, :text, :font_size, :hide_border
 
   def initialize(attrs = {})
     @top = attrs['top']
     @left = attrs['left']
     @width = attrs['width']
     @height = attrs['height']
+    @name = attrs['name']
     @text = attrs['text']
     @font_size = attrs['font_size']
     @hide_border = attrs['hide_border']
@@ -21,9 +22,14 @@ class Field
       left: left,
       width: width,
       height: height,
+      name: name,
       text: text,
       font_size: font_size,
       hide_border: hide_border
     }
+  end
+
+  def to_h
+    { type: 'field' }.merge opts
   end
 end

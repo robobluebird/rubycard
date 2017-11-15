@@ -1,14 +1,13 @@
 class CoolField < CoolElement
-  attr_accessor :code, :card_field_id, :id
-  attr_reader :java_text_widget, :font_size
-
-  def self.dsl(opts = {})
-    "cool_field #{opts[:text]}, width: #{opts[:width]}, \
-      height: #{opts[:height]}, font_size: #{opts[:font_size]}"
-  end
+  attr_accessor :name
+  attr_reader :java_text_widget, :hide_border, :font_size
 
   def text
     @words.text
+  end
+
+  def set_text(text)
+    @words.text = text
   end
 
   def increase_font_size
@@ -19,6 +18,16 @@ class CoolField < CoolElement
   def decrease_font_size
     @font_size -= 4
     font_size!
+  end
+
+  def set_font_size(font_size)
+    @font_size = font_size
+    font_size!
+  end
+
+  def set_hide_border(hide_border)
+    @hide_border = hide_border
+    @normal_border.style hidden: @hide_border
   end
 
   def font_size!
@@ -59,6 +68,7 @@ class CoolField < CoolElement
       @selected_border = border black, linestyle: :dot
       @selected_border.hide
       @words = edit_box opts[:text] || 'New Field', top: 1, left: 1, width: width - 2, height: height - 2, size: 24
+      @name = opts[:name]
     end
 
     @hide_border = opts[:hide_border] || false
@@ -85,6 +95,20 @@ class CoolField < CoolElement
     @selected_border.hide
   end
 
+  def opts
+    {
+      'type' => 'field',
+      'top' => top,
+      'left' => left,
+      'width' => width,
+      'height' => height,
+      'name' => name,
+      'text' => text,
+      'font_size' => @font_size,
+      'hide_border' => @hide_border
+    }
+  end
+
   private
 
   def behave!
@@ -93,5 +117,6 @@ class CoolField < CoolElement
     @java_text_widget.add_listener(::Swt::SWT::MouseUp, CoolListener.new(app.gui, self))
     @java_text_widget.add_listener(::Swt::SWT::MouseDoubleClick, CoolListener.new(app.gui, self))
     @java_text_widget.add_listener(::Swt::SWT::MouseMove, CoolListener.new(app.gui, self))
+    @java_text_widget.add_listener(::Swt::SWT::KeyDown, CoolListener.new(app.gui, self))
   end
 end

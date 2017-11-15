@@ -1,9 +1,15 @@
 class Stack
-  attr_accessor :name, :id, :cards
+  attr_accessor :name, :cards
 
   def initialize(attrs = {})
-    @id = attrs[:id]
     @name = attrs[:name]
     @cards = attrs[:cards] || []
+  end
+
+  def to_h
+    {
+      name: name,
+      cards: cards.map(&:to_h)
+    }
   end
 end
