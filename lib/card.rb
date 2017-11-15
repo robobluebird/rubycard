@@ -2,8 +2,6 @@ class Card
   attr_accessor :id, :elements
 
   def initialize(attrs = {})
-    @id = attrs[:id]
-
     @elements = if attrs[:elements]
                   if attrs[:elements].first.is_a?(Hash)
                     attrs[:elements].map do |elem_attrs|

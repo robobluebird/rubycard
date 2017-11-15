@@ -1,5 +1,5 @@
 class CoolButton < CoolElement
-  attr_accessor :name, :code
+  attr_accessor :name, :script
   attr_reader :button_style, :font_size
 
   def title
@@ -64,7 +64,7 @@ class CoolButton < CoolElement
     set_button_style (opts[:button_style] || :shadow).to_sym
 
     @font_size = @words.style[:size]
-    @code = opts[:code] || "puts 'hi!'"
+    @script = opts[:script] || "puts 'hi!'"
     @name = opts[:name]
   end
 
@@ -118,7 +118,7 @@ class CoolButton < CoolElement
       'title' => title,
       'font_size' => @font_size,
       'button_style' => @button_style,
-      'code' => @code
+      'script' => @script
     }
   end
 end

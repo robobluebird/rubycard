@@ -1,15 +1,16 @@
 class Button
-  attr_accessor :top, :left, :width, :height, :title, :font_size, :button_type, :code
+  attr_accessor :top, :left, :width, :height, :name, :title, :font_size, :button_type, :script
 
   def initialize(attrs = {})
     @top = attrs['top']
     @left = attrs['left']
     @width = attrs['width']
     @height = attrs['height']
+    @name = attrs['name']
     @title = attrs['title']
     @font_size = attrs['font_size']
     @button_type = attrs['button_type']
-    @code = attrs['code']
+    @script = attrs['script']
   end
 
   def method_sym
@@ -22,10 +23,11 @@ class Button
       left: left,
       width: width,
       height: height,
+      name: name,
       title: title,
       font_size: font_size,
       button_type: button_type,
-      code: code
+      script: script
     }
   end
 

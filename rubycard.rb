@@ -7,7 +7,6 @@ require './lib/button'
 require './lib/cool_card'
 require './lib/cool_button'
 require './lib/cool_field'
-require './lib/cool_popup'
 require './lib/cool_listener'
 require 'json'
 
@@ -29,19 +28,8 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
     @current_card.contents[index] if index
   end
 
-  def save!
-    to_save = {
-      name: @current_stack.name,
-      id: @current_stack.id,
-      cards: []
-    }
-
-    @current_stack.cards.each do |c|
-      to_save[:cards].push(
-        id: c.id,
-        elements: c.rep.contents.map { |e| e.to_dsl_str }
-      )
-    end
+  def element_named(name)
+    @current_card.contents.detect { |e| e.respond_to?(:name) && e.name == name }
   end
 
   def correct_tool_for?(element)
@@ -84,7 +72,6 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
   # EVENTS
 
   keypress do |key|
-    puts key
   end
 
   motion do |left, top|
@@ -98,16 +85,16 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
 
           new_left = if new_left < 0
                        0
-                     elsif new_left + @element.width >= width
-                       width - @element.width
+                     elsif new_left + @element.width >= @card_holder.width
+                       @card_holder.width - @element.width
                      else
                        new_left
                      end
 
           new_top = if new_top < 0
                       0
-                    elsif new_top + @element.height >= height
-                      height - @element.height
+                    elsif new_top + @element.height >= @card_holder.height
+                      @card_holder.height - @element.height
                     else
                       new_top
                     end
@@ -119,16 +106,16 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
 
           new_width = if new_width < 20
                         20
-                      elsif @element.left + new_width >= width
-                        width - @element.left
+                      elsif @element.left + new_width >= @card_holder.width
+                        @card_holder.width - @element.left
                       else
                         new_width
                       end
 
           new_height = if new_height < 20
                          20
-                       elsif @element.top + new_height >= height
-                         height - @element.top
+                       elsif @element.top + new_height >= @card_holder.height
+                         @card_holder.height - @element.top
                        else
                          new_height
                        end
@@ -150,12 +137,12 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
 
     if @element && correct_tool_for?(@element)
       if @element.is_a? CoolButton
-        window title: 'edit button', width: 200, height: 400 do
+        window title: 'edit button', width: 400, height: 500 do
           background lightgrey
 
           @element = owner.instance_variable_get(:@element)
 
-          stack do
+          stack margin: 5 do
             caption 'name'
             @edit_name = edit_line @element.name
 
@@ -169,8 +156,8 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
             caption 'font size'
             @edit_font_size = edit_line @element.font_size.to_s
 
-            caption 'code'
-            @edit_code = edit_box @element.code
+            caption 'script'
+            @edit_script = edit_box @element.script, width: 390, height: 200
 
             flow do
               button 'cancel' do
@@ -183,7 +170,7 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
                   @edit_title.text,
                   @list_box.text.to_sym,
                   @edit_font_size.text.to_i,
-                  @edit_code.text
+                  @edit_script.text
                 )
 
                 close
@@ -192,12 +179,12 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
           end
         end
       elsif @element.is_a? CoolField
-        window title: 'edit field', width: 200, height: 300 do
+        window title: 'edit field', width: 310, height: 300 do
           background lightgrey
 
           @element = owner.instance_variable_get(:@element)
 
-          stack do
+          stack margin: 5 do
             caption 'name'
             @edit_name = edit_line @element.name
 
@@ -240,12 +227,12 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
     @top_offset = nil
   end
 
-  def set_button_styles(name, title, button_style, font_size, code)
+  def set_button_styles(name, title, button_style, font_size, script)
     @element_to_modify.set_button_style button_style
     @element_to_modify.set_font_size font_size
     @element_to_modify.set_title title
     @element_to_modify.name = name
-    @element_to_modify.code = code
+    @element_to_modify.script = script
     @element_to_modify.style
     @element_to_modify = nil
 
@@ -265,12 +252,10 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
 
   release do |button, left, top|
     if @element
-      puts @element.class
-
       if !@gesture
         if @current_tool == :hand
-          if @element.respond_to?(:code) && !@element.code.nil?
-            instance_eval @element.code
+          if @element.respond_to?(:script) && !@element.script.nil?
+            instance_eval @element.script
           elsif @element.respond_to? :editable=
             @element.editable = true
           end
