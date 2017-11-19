@@ -1,5 +1,5 @@
 class Field
-  attr_accessor :top, :left, :width, :height, :name, :text, :font_size, :hide_border
+  attr_accessor :top, :left, :width, :height, :name, :text, :font_size, :locked, :hide_border
 
   def initialize(attrs = {})
     @top = attrs['top']
@@ -8,6 +8,7 @@ class Field
     @height = attrs['height']
     @name = attrs['name']
     @text = attrs['text']
+    @locked = attrs['locked']
     @font_size = attrs['font_size']
     @hide_border = attrs['hide_border']
   end
@@ -24,6 +25,7 @@ class Field
       height: height,
       name: name,
       text: text,
+      locked: locked,
       font_size: font_size,
       hide_border: hide_border
     }

@@ -1,6 +1,10 @@
 class CoolField < CoolElement
-  attr_accessor :name
+  attr_accessor :name, :locked
   attr_reader :java_text_widget, :hide_border, :font_size
+
+  def locked?
+    @locked
+  end
 
   def text
     @words.text
@@ -57,8 +61,8 @@ class CoolField < CoolElement
 
   def initialize_widget(opts = {})
     style_opts = { width: opts[:width] || 200, height: opts[:height] || 100 }
-    style_opts[:left] = opts[:left] || @app.width / 2 - style_opts[:width] / 2
-    style_opts[:top] = opts[:top] || @app.height / 2 - style_opts[:height] / 2
+    style_opts[:left] = opts[:left] || parent.width / 2 - style_opts[:width] / 2
+    style_opts[:top] = opts[:top] || parent.height / 2 - style_opts[:height] / 2
 
     style style_opts
 
@@ -71,6 +75,7 @@ class CoolField < CoolElement
       @name = opts[:name]
     end
 
+    @locked = opts[:locked] || false
     @hide_border = opts[:hide_border] || false
     @normal_border.style hidden: @hide_border
     @java_text_widget = @words.gui.real
@@ -104,6 +109,7 @@ class CoolField < CoolElement
       'height' => height,
       'name' => name,
       'text' => text,
+      'locked' => locked,
       'font_size' => @font_size,
       'hide_border' => @hide_border
     }

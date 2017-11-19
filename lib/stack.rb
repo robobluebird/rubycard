@@ -1,13 +1,15 @@
 class Stack
-  attr_accessor :name, :cards
+  attr_accessor :path, :name, :cards
 
   def initialize(attrs = {})
-    @name = attrs[:name]
+    @path = attrs[:path]
+    @name = attrs[:name] || attrs[:path].split('/').last
     @cards = attrs[:cards] || []
   end
 
   def to_h
     {
+      path: path,
       name: name,
       cards: cards.map(&:to_h)
     }

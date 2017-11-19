@@ -4,11 +4,13 @@ require './lib/stack'
 require './lib/card'
 require './lib/field'
 require './lib/button'
-require './lib/cool_card'
+require './lib/image'
 require './lib/cool_button'
 require './lib/cool_field'
+require './lib/cool_image'
 require './lib/cool_listener'
 require 'json'
+require 'securerandom'
 
 Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: false do
   background white
@@ -32,8 +34,15 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
     @current_card.contents.detect { |e| e.respond_to?(:name) && e.name == name }
   end
 
+  def delete_element(element)
+    element.remove
+    save!
+    unfocus_all!
+  end
+
   def correct_tool_for?(element)
-    @current_tool == element.class.to_s.underscore.split('_').last.to_sym
+    @current_tool == element.class.to_s.underscore.split('_').last.to_sym ||
+      element.is_a?(CoolImage)
   end
 
   def assign_element(left, top)
@@ -72,6 +81,10 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
   # EVENTS
 
   keypress do |key|
+    if key == :backspace && @selected
+      delete_element @selected
+      @selected = nil
+    end
   end
 
   motion do |left, top|
@@ -136,7 +149,32 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
     @element_to_modify = @element
 
     if @element && correct_tool_for?(@element)
-      if @element.is_a? CoolButton
+      if @element.is_a? CoolImage
+        window title: 'edit image', width: 400, height: 300 do
+          background lightgrey
+
+          @element = owner.instance_variable_get(:@element)
+
+          stack margin: 5 do
+            caption 'name'
+            @edit_name = edit_line @element.name
+
+            caption 'script'
+            @edit_script = edit_box @element.script, width: 390, height: 200
+
+            flow do
+              button 'cancel' do
+                close
+              end
+
+              button 'save' do
+                owner.set_image_properties(@edit_name.text, @edit_script.text)
+                close
+              end
+            end
+          end
+        end
+      elsif @element.is_a? CoolButton
         window title: 'edit button', width: 400, height: 500 do
           background lightgrey
 
@@ -165,7 +203,7 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
               end
 
               button 'save' do
-                owner.set_button_styles(
+                owner.set_button_properties(
                   @edit_name.text,
                   @edit_title.text,
                   @list_box.text.to_sym,
@@ -179,7 +217,7 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
           end
         end
       elsif @element.is_a? CoolField
-        window title: 'edit field', width: 310, height: 300 do
+        window title: 'edit field', width: 300, height: 300 do
           background lightgrey
 
           @element = owner.instance_variable_get(:@element)
@@ -190,6 +228,11 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
 
             caption 'text'
             @edit_text = edit_box @element.text
+
+            flow do
+              @lock_text = check; para 'lock text?'
+              @lock_text.checked = @element.locked?
+            end
 
             flow do
               @hide_border = check; para 'hide border?'
@@ -205,9 +248,10 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
               end
 
               button 'save' do
-                owner.set_field_styles(
+                owner.set_field_properties(
                   @edit_name.text,
                   @edit_text.text,
+                  @lock_text.checked?,
                   @hide_border.checked?,
                   @edit_font_size.text.to_i
                 )
@@ -227,7 +271,7 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
     @top_offset = nil
   end
 
-  def set_button_styles(name, title, button_style, font_size, script)
+  def set_button_properties(name, title, button_style, font_size, script)
     @element_to_modify.set_button_style button_style
     @element_to_modify.set_font_size font_size
     @element_to_modify.set_title title
@@ -239,12 +283,21 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
     save!
   end
 
-  def set_field_styles(name, text, hide_border, font_size)
+  def set_field_properties(name, text, lock_text, hide_border, font_size)
     @element_to_modify.set_text text
     @element_to_modify.set_hide_border hide_border
     @element_to_modify.set_font_size font_size
+    @element_to_modify.locked = lock_text
     @element_to_modify.name = name
     @element_to_modify.style
+    @element_to_modify = nil
+
+    save!
+  end
+
+  def set_image_properties(name, script)
+    @element_to_modify.name = name
+    @element_to_modify.script = script
     @element_to_modify = nil
 
     save!
@@ -256,8 +309,8 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
         if @current_tool == :hand
           if @element.respond_to?(:script) && !@element.script.nil?
             instance_eval @element.script
-          elsif @element.respond_to? :editable=
-            @element.editable = true
+          elsif @element.respond_to?(:editable=) && @element.respond_to?(:locked?)
+            @element.editable = true unless @element.locked?
           end
 
           make_fields_uneditable!
@@ -265,7 +318,7 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
           select @element
         end
       else
-        select @element if @element != @selected_element && correct_tool_for?(@element)
+        select @element if @element != @selected && correct_tool_for?(@element)
         save!
       end
     else
@@ -302,8 +355,8 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
 
   def select(element)
     @selected.deselect if @selected
-    element.select
     @selected = element
+    @selected.select
   end
 
   def deselect!
@@ -313,11 +366,11 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
   end
 
   def load!(json)
-    @current_stack = Stack.new name: json['name']
+    @current_stack = Stack.new path: json['path'], name: json['name']
     @current_card_index = 0
 
     json['cards'].each do |card_json|
-      @current_stack.cards.push Card.new elements: card_json['elements']
+      @current_stack.cards.push Card.new id: card_json['id'], elements: card_json['elements']
     end
 
     represent!
@@ -336,7 +389,7 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
 
     @current_stack.cards[@current_card_index].elements = elements
 
-    File.open(@current_stack.name, 'w+') do |f|
+    File.open(@current_stack.path, 'w+') do |f|
       f.write JSON.pretty_generate(@current_stack.to_h)
     end
   end
@@ -456,6 +509,18 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
             save!
           end
 
+          button 'new image' do
+            filename = ask_open_file
+
+            if filename
+              @current_card.append do
+                cool_image path: filename
+              end
+
+              save!
+            end
+          end
+
           button 'next card' do
             next_card!
           end
@@ -495,12 +560,18 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
           filename = ask_save_file
 
           if filename
-            @current_stack = Stack.new name: filename
-            @current_stack.cards.push Card.new
-            @current_card_index = 0
+            if File.exist? filename
+              alert "Stack with name \"#{filename.split('/').last}\" already exists!"
+            else
+              @current_stack = Stack.new path: filename
+              @current_stack.cards.push Card.new
+              @current_card_index = 0
 
-            represent!
-            save!
+              represent!
+              save!
+
+              @stack_related_stuff.show
+            end
           end
         end
 
