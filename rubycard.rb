@@ -3,20 +3,24 @@ require './lib/cool_element'
 require './lib/stack'
 require './lib/card'
 require './lib/field'
+require './lib/field_too'
 require './lib/button'
 require './lib/image'
 require './lib/cool_button'
 require './lib/cool_field'
+require './lib/cool_field_too'
 require './lib/cool_image'
 require './lib/cool_listener'
+
 require 'json'
 require 'securerandom'
 
-Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: false do
-  background white
+Shoes.app title: 'rubycard', width: 1035, height: 562, resizable: false, scroll: false do
+  background lightgrey
 
   @current_tool = :hand
   @element = nil
+  @focused_element = nil
   @gesture = false
   @left_offset = nil
   @top_offset = nil
@@ -42,22 +46,32 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
 
   def correct_tool_for?(element)
     @current_tool == element.class.to_s.underscore.split('_').last.to_sym ||
-      element.is_a?(CoolImage)
+      element.is_a?(CoolImage) ||
+      element.is_a?(CoolFieldToo)
   end
 
   def assign_element(left, top)
-    return if @current_card.nil?
+    if message_box_clicked? left, top
+      @element = @message_box
+    else
+      return if @current_card.nil?
 
-    @current_card.contents.each do |elem|
-      next unless elem.is_a?(CoolElement) && interaction_type(elem, left, top)
+      @current_card.contents.each do |elem|
+        next unless elem.is_a?(CoolElement) && interaction_type(elem, left, top)
 
-      @element = elem
-      @left_offset = left - @element.left
-      @top_offset = top - @element.top
+        @element = elem
+        @left_offset = left - @element.left
+        @top_offset = top - @element.top
+      end
     end
   end
 
-  def interaction_type(elem, left, top)
+  def message_box_clicked? left, top
+    (@message_box.left..(@message_box.left + @message_box.width)).cover?(left) &&
+      (@message_box.top..(@message_box.top + @message_box.height)).cover?(top)
+  end
+
+  def interaction_type elem, left, top
     left_ranges = [
       (elem.left + elem.width - 10)..(elem.left + elem.width),
       elem.left..(elem.left + elem.width)
@@ -78,12 +92,79 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
     end
   end
 
-  # EVENTS
+  def tell someone, *words
+    modifier = words.shift
+
+    new_modifier = if modifier =~ /.+'s\z/
+                     'you are'
+                   elsif modifier =~ /.+'re\z/
+                     'you are'
+                   elsif words.join(' ') =~ /.+\ (is|are)/
+                     'you are'
+                   else
+                     modifier
+                   end
+
+    words = [new_modifier] + words
+
+    alert "#{someone.capitalize}, #{words.join ' '}!"
+  end
+
+  def find phrase
+    cards_found = @current_stack.cards.select do |card|
+      fields = card.contents.select { |elem| elem.is_a? CoolFieldToo }
+    end
+  end
+
+  def execute_message! message
+    return if message.empty?
+
+    pieces = message.strip.split ' '
+    first_word = pieces.shift
+
+    sendable = if self.respond_to? first_word.to_sym
+                 "#{first_word} #{pieces.map { |w| "\"#{w}\"" }.join(', ')}"
+               else
+                 "#{first_word} #{pieces.join(' ')}"
+               end
+
+    result = instance_eval(sendable).to_s
+
+    make_fields_uneditable!
+    defocus_all!
+    deselect!
+    @message_box.text = result
+  rescue => e
+    puts e
+    alert "Couldn't understand \"#{message}\""
+  end
 
   keypress do |key|
-    if key == :backspace && @selected
-      delete_element @selected
-      @selected = nil
+    if key.is_a?(String)
+      if @focused_element
+        if @focused_element == @message_box
+          if key == "\n"
+            execute_message! @message_box.text
+          else
+            @focused_element.add_text key
+          end
+        else
+          @focused_element.add_text key
+        end
+      end
+    else
+      if key == :backspace
+        if @focused_element
+          @focused_element.remove_chars
+        elsif @selected
+          delete_element @selected
+          @selected = nil
+        end
+      elsif key == :super_h || key == :super_left
+        prev_card!
+      elsif key == :super_l || key == :super_right
+        next_card!
+      end
     end
   end
 
@@ -96,18 +177,14 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
           new_left = left - @left_offset
           new_top = top - @top_offset
 
-          new_left = if new_left < 0
-                       0
-                     elsif new_left + @element.width >= @card_holder.width
-                       @card_holder.width - @element.width
+          new_left = if left <= 0 || left >= @card_holder.width
+                       @element.left
                      else
                        new_left
                      end
 
-          new_top = if new_top < 0
-                      0
-                    elsif new_top + @element.height >= @card_holder.height
-                      @card_holder.height - @element.height
+          new_top = if top <= 0 || top >= @card_holder.height
+                      @element.top
                     else
                       new_top
                     end
@@ -198,6 +275,12 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
             @edit_script = edit_box @element.script, width: 390, height: 200
 
             flow do
+              button 'brint to front' do
+                owner.bring_to_front @element
+              end
+            end
+
+            flow do
               button 'cancel' do
                 close
               end
@@ -216,7 +299,7 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
             end
           end
         end
-      elsif @element.is_a? CoolField
+      elsif @element.is_a?(CoolField) || @element.is_a?(CoolFieldToo)
         window title: 'edit field', width: 300, height: 300 do
           background lightgrey
 
@@ -236,7 +319,12 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
 
             flow do
               @hide_border = check; para 'hide border?'
-              @hide_border.checked = @element.hide_border
+              @hide_border.checked = @element.border_hidden?
+            end
+
+            flow do
+              @transparent = check; para 'transparent background?'
+              @transparent.checked = @element.transparent?
             end
 
             caption 'font size'
@@ -253,6 +341,7 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
                   @edit_text.text,
                   @lock_text.checked?,
                   @hide_border.checked?,
+                  @transparent.checked?,
                   @edit_font_size.text.to_i
                 )
 
@@ -283,11 +372,12 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
     save!
   end
 
-  def set_field_properties(name, text, lock_text, hide_border, font_size)
-    @element_to_modify.set_text text
-    @element_to_modify.set_hide_border hide_border
-    @element_to_modify.set_font_size font_size
+  def set_field_properties(name, text, lock_text, hide_border, transparent, font_size)
+    @element_to_modify.border_hidden = hide_border
+    @element_to_modify.font_size = font_size
+    @element_to_modify.text = text
     @element_to_modify.locked = lock_text
+    @element_to_modify.transparent = transparent
     @element_to_modify.name = name
     @element_to_modify.style
     @element_to_modify = nil
@@ -305,10 +395,16 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
 
   release do |button, left, top|
     if @element
-      if !@gesture
+      if @element == @message_box
+        @element.focus true
+        @focused_element = @element
+      elsif !@gesture
         if @current_tool == :hand
           if @element.respond_to?(:script) && !@element.script.nil?
             instance_eval @element.script
+          elsif @element.is_a? CoolFieldToo
+            @element.focus true
+            @focused_element = @element
           elsif @element.respond_to?(:editable=) && @element.respond_to?(:locked?)
             @element.editable = true unless @element.locked?
           end
@@ -323,7 +419,9 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
       end
     else
       make_fields_uneditable!
+      defocus_all!
       deselect!
+      @focused_element = nil
     end
 
     @element = nil
@@ -353,6 +451,22 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
     end
   end
 
+  def defocus_all!
+    fields = if @current_card
+              @current_card.contents.select do |elem|
+                elem.is_a? CoolFieldToo
+              end
+            else
+              []
+            end
+
+    fields << @message_box
+
+    fields.each do |elem|
+      elem.focus false
+    end
+  end
+
   def select(element)
     @selected.deselect if @selected
     @selected = element
@@ -363,6 +477,20 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
     return unless @selected
     @selected.deselect
     @selected = nil
+  end
+
+  def bring_to_front element
+    element.remove
+
+    save!
+
+    name = element.opts['type'].to_s.split('_').map(&:capitalize).join
+
+    @current_stack.cards[@current_card_index].elements.push constantize(name).new element.opts
+
+    represent!
+
+    save!
   end
 
   def load!(json)
@@ -383,7 +511,8 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
 
     @current_card.contents.each do |elem|
       if elem.is_a? CoolElement
-        elements.push constantize(elem.opts['type'].to_s.capitalize).new elem.opts
+        name = elem.opts['type'].to_s.split('_').map(&:capitalize).join
+        elements.push constantize(name).new elem.opts
       end
     end
 
@@ -437,13 +566,6 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
     end
   end
 
-  def default!
-    stack left: 0, top: 0, width: 512, height: '100%'  do
-      t = title 'rubycard', align: 'center'
-      t.style top: height / 2 - t.height / 2
-    end
-  end
-
   def select_tool(tool)
     return if @current_card.nil?
 
@@ -465,13 +587,17 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
   end
 
   flow top: 0, left: 0, width: '100%', height: '100%' do
-    background white
+    background lightgrey
 
-    @card_holder = default!
+    @message_box = cool_field_too text: '', top: 520, left: 5, height: 30, width: 910, font_size: 20, hide_border: true
 
-    stack top: 0, left: 512, width: 120, height: '100%' do
-      background lightgrey
+    @card_holder = stack left: 5, top: 0, width: 910, height: 512  do
+      background white
+      t = title 'rubycard', align: 'center'
+      t.style top: height / 2 - t.height / 2
+    end
 
+    stack top: 0, left: 915, width: 120, height: '100%' do
       @stack_related_stuff = stack do
         flow margin: 5, height: 84 do
           background black
@@ -503,7 +629,7 @@ Shoes.app title: 'rubycard', width: 632, height: 512, resizable: false, scroll: 
 
           button 'new field' do
             @current_card.append do
-              cool_field
+              cool_field_too
             end
 
             save!

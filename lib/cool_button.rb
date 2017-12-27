@@ -54,8 +54,8 @@ class CoolButton < CoolElement
       @shadow = rect 2, 2, width - 2, height - 2, 4
       @background = background white, curve: 4, width: width - 2, height: height - 2
       @normal_border = border black, curve: 4, strokewidth: 1, width: width - 2, height: height - 2
-      @button_selected_border = border black, linestyle: :dot
-      @button_selected_border.hide
+      @selected_border = border black, linestyle: :dot
+      @selected_border.hide
       @words = para opts[:title] || 'New Button', left: 0, align: 'center'
       @words.style(top: @words.parent.height / 2 - @words.height / 2)
       @words.style(size: opts[:font_size]) if opts[:font_size]
@@ -98,13 +98,13 @@ class CoolButton < CoolElement
   def select
     @normal_border.hide
     @shadow.hide
-    @button_selected_border.show
+    @selected_border.show
   end
 
   def deselect
     @normal_border.show if @button_style != :transparent
     @shadow.show if @button_style == :shadow
-    @button_selected_border.hide
+    @selected_border.hide
   end
 
   def opts

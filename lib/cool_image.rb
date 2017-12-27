@@ -42,11 +42,7 @@ class CoolImage < CoolElement
 
     # technically we should use these from opts instead of h/w (or should we?)
     # but instead I am just recalculating them on instantiation (dumb)
-    @ratio, @ratio_direction = if opts[:ratio]
-                                 [opts[:ratio], opts[:ratio_direction]]
-                               else
-                                 image_size_properties
-                               end
+    @ratio, @ratio_direction = image_size_properties
 
     # if instantiating with a desired h/w, set those styles on the image first
     # because we use the image's h/w to set the overall h/w
@@ -55,36 +51,32 @@ class CoolImage < CoolElement
     # ALSO keep things from being too big!!
     if opts[:height] && opts[:width]
       @image.style height: opts[:height], width: opts[:width]
-    elsif @image.width > parent.width
-      new_dimensions = {}
-
-      if @ratio_direction == :width
-        new_dimensions[:width] = parent.width
-        new_dimensions[:height] = parent.width * @ratio
-      else
+    else
+      if @ratio_direction == :height && @image.height > parent.height
+        new_dimensions = {}
         new_dimensions[:height] = parent.height
         new_dimensions[:width] = parent.height * @ratio
+
+        @image.style new_dimensions
+      elsif @ratio_direction == :width
+        new_dimensions = {}
+
+        if @ratio > (parent.height / parent.width)
+          new_dimensions[:height] = parent.height
+          new_dimensions[:width] = parent.height / @ratio
+        else
+          new_dimensions[:width] = parent.width
+          new_dimensions[:height] = parent.width * @ratio
+        end
+
+        @image.style new_dimensions
       end
-
-      @image.style new_dimensions
-    elsif @image.height > parent.height
-      new_dimensions = {}
-
-      if @ratio_direction == :height
-        new_dimensions[:height] = parent.height
-        new_dimensions[:width] = parent.height * @ratio
-      else
-        new_dimensions[:width] = parent.width
-        new_dimensions[:height] = parent.width * @ratio
-      end
-
-      @image.style new_dimensions
     end
 
     # set top/left/height/width on the outer "cool image" container
     style_opts = { width: @image.width, height: @image.height }
-    style_opts[:left] = opts[:left] || parent.width / 2 - @image.width / 2
-    style_opts[:top] = opts[:top] || parent.height / 2 - @image.height / 2
+    style_opts[:left] = opts[:left] || 0
+    style_opts[:top] = opts[:top] || 0
 
     style style_opts
   end

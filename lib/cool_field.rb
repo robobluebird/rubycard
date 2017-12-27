@@ -46,6 +46,10 @@ class CoolField < CoolElement
     @java_text_widget.set_editable editable
   end
 
+  def editable?
+    @java_text_widget.get_editable
+  end
+
   def style(styles = nil)
     super styles
 

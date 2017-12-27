@@ -49,6 +49,41 @@ class Shoes
   module Swt
     ICON = 'lib/images/bill.png'
 
+    class TextBlock
+      class CursorPainter
+        def draw_textcursor
+          segment = @collection.segment_at_text_position(@text_block_dsl.cursor)
+          relative_cursor = @collection.relative_text_position(@text_block_dsl.cursor)
+          position = segment.get_location(relative_cursor)
+          #
+          # if @text_block_dsl.text[-1] == "\n"
+          #   count = 0
+          #   idx = -1
+          #
+          #   while @text_block_dsl.text[idx] == "\n"
+          #     count += 1
+          #     idx -= 1
+          #   end
+          #
+          #   move_if_necessary(segment.element_left,
+          #     segment.element_top + position.y + (textcursor.height * count))
+          # else
+          #   move_if_necessary(segment.element_left + position.x,
+          #                     segment.element_top + position.y)
+          # end
+
+          move_if_necessary(segment.element_left + position.x,
+                            segment.element_top + position.y)
+        end
+
+        def move_if_necessary(x, y)
+          unless textcursor.left == x && textcursor.top == y
+            move_textcursor(x, y)
+          end
+        end
+      end
+    end
+
     class Border
       class Painter
         def draw_setup(gc)

@@ -6,7 +6,8 @@ class Card
     @elements = if attrs[:elements]
                   if attrs[:elements].first.is_a?(Hash)
                     attrs[:elements].map do |elem_attrs|
-                      constantize(elem_attrs['type'].to_s.capitalize).new elem_attrs
+                      name = elem_attrs['type'].to_s.split('_').map(&:capitalize).join
+                      constantize(name).new elem_attrs
                     end
                   else
                     attrs[:elements]
